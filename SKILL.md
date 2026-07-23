@@ -75,6 +75,18 @@ Content-Type: application/json
 | GET | `/api/issues?limit=N` | List issues (default returns all) |
 | GET | `/api/issues/{identifier}` | Get single issue detail |
 | GET | `/api/issues/{identifier}?include=comments` | Get issue with comments |
+
+### Web UI URL Format
+
+Issue detail pages on the Mobius web UI use **`/issue/`** prefix (NOT `/all/`):
+
+```
+https://mobius.feedmob.com/issue/AI-1234    ← ✅ correct (issue detail page)
+https://mobius.feedmob.com/all/AI-1234      ← ❌ wrong (board view, will show blank/error)
+```
+
+`/all/` is the board (list) view. `/issue/` is the single-issue detail view.
+Always use `/issue/{identifier}` when generating links for the user.
 | GET | `/api/teams` | List all teams + members |
 | GET | `/api/labels` | List all labels |
 | GET | `/api/projects` | List all projects |
