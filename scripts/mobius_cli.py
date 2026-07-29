@@ -23,6 +23,7 @@ import os
 import sys
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime, timezone
 
 BASE_URL = "https://mobius.feedmob.com"
@@ -118,6 +119,11 @@ def resolve_label_id(label_name):
     return None
 
 
+def issue_url(identifier):
+    """Generate the correct Mobius web UI URL for an issue."""
+    return f"{BASE_URL}/issue/{identifier}"
+
+
 def cmd_list_active(args):
     team_id = args.team or TEAM_AI
     issues = api("GET", f"/api/issues?teamId={team_id}&limit=500")
@@ -151,6 +157,7 @@ def cmd_get(args):
     print(f"Labels: [{labels}]")
     print(f"Created: {issue.get('createdAt','')[:10]} | Updated: {issue.get('updatedAt','')[:10]} | Comments: {issue.get('commentCount',0)}")
     print(f"Title: {issue['title']}")
+    print(f"URL: {issue_url(issue['identifier'])}")
     print(f"{'='*60}")
 
     desc = issue.get("description", "") or ""
@@ -230,8 +237,7 @@ def cmd_create(args):
 
     result = api("POST", "/api/issues", payload)
     print(f"Created: {result['identifier']} — {result['title']}")
-    if "url" in result:
-        print(f"URL: {result['url']}")
+    print(f"URL: {issue_url(result['identifier'])}")
 
 
 def cmd_update_status(args):
@@ -244,6 +250,7 @@ def cmd_update_status(args):
     state_id = resolve_state_id(args.state)
     result = api("PATCH", f"/api/issues/{issue['id']}", {"stateId": state_id})
     print(f"Updated {args.identifier} → {args.state}")
+    print(f"URL: {issue_url(args.identifier)}")
 
 
 def cmd_add_comment(args):
@@ -342,5 +349,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import urllib.parse  # needed for quote in search
     main()

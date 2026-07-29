@@ -1,0 +1,12 @@
+# Editor
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Settings (contains team IDs, not secrets, but keep local)
+.mobius-ticket-pilot/
+
+# Python
+__pycache__/
+*.pyc
