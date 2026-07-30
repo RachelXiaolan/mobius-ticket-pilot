@@ -6,7 +6,7 @@ description: >
   Use when the user asks to read/create/update Mobius issues, check team progress,
   analyze issue priorities, post progress comments, or change issue status.
   Designed for FeedMob's internal Mobius system (mobius.feedmob.com).
-version: 1.0.2
+version: 1.1.0
 author: Rachel Lu
 license: MIT
 platforms: [linux, macos]
@@ -226,11 +226,56 @@ use **labels** to indicate all participants.
 1. **Resolve the target issue** from the user request (ID, URL, or query).
    - Read the issue with `?include=comments` to get full context + AI background.
 2. **Confirm ownership and scope.** Apply Label & Assignee Rules.
-3. **Mark work started.**
-   - `PATCH /api/issues/{id}` with `stateId` = In Progress.
-   - Post a comment with scope and first planned step.
-4. **Do the work**, posting phase-based progress comments (see Comment Principles).
-5. **On completion**, move to In Review or Done and post completion comment.
+3. **Mark work started** — use `auto_progress.py start` (handles state + comment atomically).
+4. **Do the work**, posting phase-based progress comments via `auto_progress.py progress`.
+5. **On completion**, use `auto_progress.py review` or `auto_progress.py done`.
+
+## Auto Progress Tracker (MUST USE)
+
+**At every lifecycle point, call `auto_progress.py` — do NOT manually PATCH state + POST
+comment separately.** This script does both atomically and ensures no step is forgotten.
+
+```bash
+SCRIPT="$(find ~/.hermes ~/.claude ~/.codex ~/.openclaw 2>/dev/null -path '*/mobius-ticket-pilot/scripts/auto_progress.py' | head -1)"
+
+# 🚀 Begin work → In Progress + start comment
+python3 "$SCRIPT" start AI-1234 --scope "写 MCP 配置文档" --plan "先调研现有文档"
+
+# 💬 Phase milestone → comment only (no state change)
+python3 "$SCRIPT" progress AI-1234 --summary "414行文档完成" --output "notes已同步" --next "提交PR"
+
+# 🛑 Stuck → blocker comment (no state change)
+python3 "$SCRIPT" blocker AI-1234 --error "tsc有92个错误" --check "检查@types/node是否缺失"
+
+# 🎉 Complete → In Review + completion comment
+python3 "$SCRIPT" review AI-1234 --summary "文档+2个PR已提交" --links "https://github.com/.../pull/45"
+
+# ✅ Fully done → Done + done comment
+python3 "$SCRIPT" done AI-1234 --summary "PR merged, 文档上线" --links "https://github.com/.../pull/45"
+```
+
+### Lifecycle reference
+
+| Phase | Command | State change | Emoji |
+|-------|---------|-------------|-------|
+| Start | `start` | → In Progress | 🚀 |
+| Milestone | `progress` | none | 💬 |
+| Blocker | `blocker` | none | 🛑 |
+| Submit | `review` | → In Review | 🎉 |
+| Finish | `done` | → Done | ✅ |
+
+### When to call each command
+
+- **`start`**: Once, when work begins. Always the first call.
+- **`progress`**: After each meaningful phase completes (e.g. "调研完了", "代码写完了",
+  "PR 提交了"). NOT after every tool call — only at phase boundaries.
+- **`blocker`**: When stuck and need human input (e.g. error, permission issue,
+  ambiguous requirement).
+- **`review`**: When work is delivered and needs human verification (default for most tasks).
+- **`done`**: When work is fully verified and no further action needed.
+
+**Rule of thumb:** If 5 tool calls are part of "writing a report", call `progress` ONCE
+when the report is done — not 5 times.
 
 ## Comment Principles
 
@@ -267,14 +312,22 @@ Quick summary:
 2. Filter active (exclude `completed`, `canceled`, `duplicate`).
 3. Group by assignee AND labels (Mobius assignee is single-user; labels carry multi-person ownership).
 4. Classify patterns (stuck, ancient, clusters, unassigned, overloaded, Lead's new direction).
-5. **ALL issues MUST appear in the 8-column table** (see format below). Do NOT replace tables with prose/narrative summaries.
-6. Group tables by Mobius state: **In Review → 未分配 → In Progress → Todo → Backlog**.
+5. **Use 8-column tables for issues you DO include** — but the report is analysis-driven,
+   NOT an exhaustive listing. Only include issues that are stuck, In Review, unassigned,
+   ancient (>60d), overlapping, key developer items, or notable shifts from last report.
+6. Group by **what needs attention**: In Review (待验收) → 未分配 → per-person deep dives
+   (Teammate-B/Teammate-A/Teammate-C — their stuck/old items only, not everything).
 7. Add a Top 5 summary table at the end.
 8. Sync to `<notes-vault>/<notes folder>/AI-team-Issue优先级分析-YYYYMMDD-Mobius.md`.
 
-### ⚠️ Output format — NON-NEGOTIABLE
+### ⚠️ Output format — ANALYSIS-DRIVEN, NOT EXHAUSTIVE LISTING
 
-The user has corrected this: **every active issue goes into the 8-column table**, never into prose/narrative sections. Do not create custom section layouts, per-person narrative blocks, or bullet-list summaries as a substitute. The table IS the report.
+The user has corrected this repeatedly. The report is a **management tool for priority
+decisions**, NOT a data export. Two hard rules:
+1. Use 8-column tables for all issues you include — never prose/narrative.
+2. Do NOT list every active issue. Only include: stuck, In Review, unassigned,
+   ancient (>60d), overlapping, key developer items, or notable shifts.
+   Omit routine "正常推进" Todo/Backlog items. Do NOT pad for completeness.
 
 ```
 | Issue | 状态 | Label(→负责人) | 创建 | 最后更新 | 简介 | 建议原因 | 建议处理方式 |
@@ -285,8 +338,10 @@ The user has corrected this: **every active issue goes into the 8-column table**
 - **建议原因**: WHY you're making this suggestion (1 sentence — last comment date, zero comments, stuck duration, etc.)
 - **建议处理方式**: concrete next action (验收→Done, 分配给X, 确认Cancel, 正常推进, etc.)
 
-Group the tables by state in this order: In Review (待验收) → 未分配 → In Progress → Todo → Backlog.
-Then a short Top 5 table at the end with the most actionable items.
+Organize by what needs attention: In Review (待验收) → 未分配 → per-person deep dives
+(Teammate-B/Teammate-A/Teammate-C — their stuck/old items only). Then a short Top 5 table at the end
+with the most actionable items. Do NOT list all 70+ issues — this is an analysis report,
+not a data export.
 
 For the full audit workflow (batch fetching, classification patterns, tiered report
 format, per-person breakdown, and notes sync), read
@@ -515,6 +570,31 @@ acknowledge the error directly ("我的判断失误——当时只看了标题�
 explain what the actual relationship is (often upstream/downstream dependency, not
 duplication), and give the user a corrected recommendation to share with the team.
 
+### `add-comment` CLI helper fails silently on long/complex bodies
+
+The `mobius_cli.py add-comment` subcommand can silently fail (exit 0, empty output)
+when the comment body is long, contains markdown formatting, or has special
+characters. It does not reliably surface API errors.
+
+**Fix:** For posting comments, prefer `curl` directly over the CLI helper:
+
+```python
+import subprocess, json, os
+api_key = os.environ["MOBIUS_API_KEY"]
+r = subprocess.run(
+    ['curl', '-s', '-X', 'POST', f'https://mobius.feedmob.com/api/issues/AI-XXXX/comments',
+     '-H', f'Authorization: Bearer {api_key}',
+     '-H', 'Content-Type: application/json',
+     '-d', json.dumps({"body": comment_text})],
+    capture_output=True, text=True
+)
+# Check for "id" in response JSON to confirm success
+```
+
+This handles Unicode/JSON escaping correctly and returns the full API response
+for error checking. The CLI helper is fine for read operations (`get`, `list-active`,
+`search`, `team-status`).
+
 ### State IDs are per-team and may change
 
 The state UUIDs documented above are specific to ai-team (AI) as of 2026-07-23.
@@ -532,6 +612,7 @@ Stop and ask the user when:
 
 ## Resources
 
+- `scripts/auto_progress.py` — **MUST USE at every lifecycle point.** Automates state transition + formatted comment in one atomic command (start/progress/blocker/review/done).
 - `scripts/mobius_cli.py` — Python CLI for common Mobius operations.
 - `references/onboarding-settings.md` — first-run onboarding and settings format.
 - `references/state-model.md` — Mobius state model and comment contract.

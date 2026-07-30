@@ -67,12 +67,24 @@ for person in ["Teammate-A", "Teammate-B", "Teammate-C", "Teammate-D", "Teammate
 
 ## Output Format
 
-### ⚠️ Format rule — NON-NEGOTIABLE
+### ⚠️ Format rule — ANALYSIS-DRIVEN, NOT EXHAUSTIVE LISTING
 
-The user has corrected this: **every active issue goes into the 8-column table**.
-Do NOT replace tables with prose/narrative summaries, custom section layouts, or
-per-person narrative blocks. The table IS the report. A prose summary section at
-the top (totals + trends) is fine, but ALL issues must appear in tables.
+The user has corrected this repeatedly. The report is a **management tool for
+priority decisions**, NOT a data export. Rules:
+
+1. **Use 8-column tables** for all issues you DO include — never replace tables
+   with prose/narrative. The table format is non-negotiable.
+2. **Do NOT list every active issue.** Only include issues that are:
+   - Stuck (no update > 10 days, zero comments, blocked)
+   - In Review (need verification — the biggest bottleneck)
+   - Unassigned (especially Mobius self-bugs)
+   - Ancient (> 60 days — suggest Cancel)
+   - Overlapping/clustered (need merge/split decision)
+   - Key developer deep-dives (Teammate-B/Teammate-A/Teammate-C — their top items only)
+   - Notable shifts from last report (new batches, sudden progress)
+3. **Omit** routine "正常推进" Todo/Backlog items unless they're ancient or unusual.
+   Do NOT pad the report with 30+ Todo items just for completeness.
+4. A short 总览 table (totals + per-person counts) at the top is always included.
 
 ### 8-column table
 
@@ -87,21 +99,18 @@ the top (totals + trends) is fine, but ALL issues must appear in tables.
 - **建议原因**: WHY this suggestion (1 sentence — last comment date, zero comments, stuck duration, etc.)
 - **建议处理方式**: concrete action (验收→Done, 分配给X, 确认Cancel, 正常推进, etc.)
 
-### Report structure (group by Mobius state)
+### Report structure (analysis-driven sections)
 
-Organize the report into state-grouped sections, each with its own table:
+1. **总览** — 1 small table (totals + per-person counts) + 2-3 sentence trend readout
+2. **In Review 堆积** — ALL In Review issues (these are the primary push targets)
+3. **未分配** — ALL unassigned issues (especially Mobius self-bugs → Teammate-A)
+4. **重点开发人员分析** — Per-person deep dive tables (Teammate-B/Teammate-A/Teammate-C/Teammate-D),
+   showing only their **stuck/old/notable items** — NOT every issue they own.
+   Add a 2-3 sentence summary per person: what they shipped, what's stuck, what to push.
+5. **Top 5 建议优先推动** — short summary table at the very end (the only curated ranking)
 
-1. **总览** — 1 small table (totals + per-person counts)
-2. **In Review — 待验收** — highest priority, these need action first
-3. **未分配** — unassigned issues (especially Mobius self-bugs that should go to Teammate-A)
-4. **In Progress** — ongoing work, flag stuck items
-5. **Todo** — backlog + ancient items (flag >60 day issues for Cancel)
-6. **Backlog** — dormant items
-7. **Top 5 建议优先推动** — short summary table at the very end
-
-**Do NOT** group by priority tiers (🔴/🟡/🟠) — group by state instead.
-The user wants to see ALL issues in state-grouped tables, not a
-curated subset in priority tiers. The Top 5 at the end is the only curated view.
+**Do NOT** group by priority tiers (🔴/🟡/🟠) or by raw Mobius state for the whole report.
+The report is organized by *what needs attention*, with per-person sections for context.
 
 Also note: the last column is **建议处理方式** (suggested action), not 处理结果 (result).
 

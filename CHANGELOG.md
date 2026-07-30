@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-07-31
+
+### Added
+- `scripts/auto_progress.py` — **auto progress tracker**: automates state transition + formatted comment in one atomic command. 5 lifecycle points: `start` (🚀→In Progress), `progress` (💬 milestone), `blocker` (🛑 stuck), `review` (🎉→In Review), `done` (✅→Done)
+- SKILL.md: new "Auto Progress Tracker (MUST USE)" section — Agent must call `auto_progress.py` at every lifecycle point instead of manually PATCH+POST
+- SKILL.md: "When to call each command" guide with rule of thumb
+
+### Changed
+- SKILL.md: Start Workflow rewritten to reference `auto_progress.py` instead of manual PATCH+POST
+- SKILL.md: version bumped to 1.1.0
+
 ## [1.0.2] - 2026-07-24
 
 ### Added

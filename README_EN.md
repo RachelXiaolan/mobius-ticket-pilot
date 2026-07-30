@@ -114,6 +114,22 @@ A core feature. When you say "analyze priorities" or "check team status":
 
 **Entirely read-only — no issues are modified.**
 
+## Auto Progress Tracker (auto_progress.py)
+
+The skill bundles an **auto progress tracker** that handles state transitions + formatted comments in one atomic command — no manual PATCH + POST needed:
+
+```bash
+SCRIPT="$(find ~/.hermes ~/.claude ~/.codex 2>/dev/null -path '*/mobius-ticket-pilot/scripts/auto_progress.py' | head -1)"
+
+python3 "$SCRIPT" start AI-1234 --scope "Write MCP docs" --plan "Research first"    # 🚀 → In Progress
+python3 "$SCRIPT" progress AI-1234 --summary "Docs done" --next "Submit PR"         # 💬 Phase comment
+python3 "$SCRIPT" blocker AI-1234 --error "Build error" --check "Check deps"       # 🛑 Blocked
+python3 "$SCRIPT" review AI-1234 --summary "Docs+PR submitted" --links "PR link"    # 🎉 → In Review
+python3 "$SCRIPT" done AI-1234 --summary "PR merged" --links "PR link"             # ✅ → Done
+```
+
+The Agent calls these automatically when processing an issue — you don't need to manage status or comments manually.
+
 ## CLI Helper
 
 ```bash
@@ -175,6 +191,7 @@ mobius-ticket-pilot/
 │   ├── frontend-codebase.md              # Mobius frontend codebase map (for PRs)
 │   └── agent-automation.md               # Agent automation field pitfalls (delegatedAgentId)
 └── scripts/
+    ├── auto_progress.py                  # 🆕 Auto state+comment (start/progress/blocker/review/done)
     └── mobius_cli.py                     # Python CLI helper
 ```
 

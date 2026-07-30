@@ -114,6 +114,22 @@ Agent 会拉取所有活跃 Issue，分析哪些卡住了、哪些值得推，�
 
 **全程只读，不会修改任何 Issue。**
 
+## 自动进度追踪（auto_progress.py）
+
+Skill 内置一个**自动进度追踪脚本**，在任务的关键节点自动更新 Issue 状态 + 发格式化评论，不用手动 PATCH + POST：
+
+```bash
+SCRIPT="$(find ~/.hermes ~/.claude ~/.codex 2>/dev/null -path '*/mobius-ticket-pilot/scripts/auto_progress.py' | head -1)"
+
+python3 "$SCRIPT" start AI-1234 --scope "写 MCP 配置文档" --plan "先调研"        # 🚀 → In Progress
+python3 "$SCRIPT" progress AI-1234 --summary "文档完成" --next "提交PR"          # 💬 阶段评论
+python3 "$SCRIPT" blocker AI-1234 --error "编译报错" --check "检查依赖"          # 🛑 阻塞
+python3 "$SCRIPT" review AI-1234 --summary "文档+PR已提交" --links "PR链接"      # 🎉 → In Review
+python3 "$SCRIPT" done AI-1234 --summary "PR merged" --links "PR链接"           # ✅ → Done
+```
+
+Agent 在处理 Issue 时会自动调用这些命令，你不需要操心状态更新和评论发布。
+
 ## CLI 辅助工具
 
 装好后可以用命令行快速操作：
@@ -197,6 +213,7 @@ mobius-ticket-pilot/
 │   ├── frontend-codebase.md              # Mobius 前端代码库地图（贡献 PR 用）
 │   └── agent-automation.md               # Agent 自动化字段陷阱（delegatedAgentId）
 └── scripts/
+    ├── auto_progress.py                  # 🆕 自动状态+评论（start/progress/blocker/review/done）
     └── mobius_cli.py                     # Python CLI 辅助工具
 ```
 
