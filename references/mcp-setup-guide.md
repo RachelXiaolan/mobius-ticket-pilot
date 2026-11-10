@@ -276,20 +276,12 @@ reports, then call `list_teams`.
 | `unstarted` | Todo |
 | `started` | In Progress, In Review |
 | `completed` | Done |
-| `canceled` | Canceled (and Duplicate on ai-team — query it with `stateNames`) |
+| `canceled` | Canceled (and Duplicate on the AI team — query it with `stateNames`) |
 
-### Team Keys (2026-11-10 — re-check with `list_teams`)
+### Team Keys
 
-| Team | Key |
-|------|-----|
-| ai-team | `AI` |
-| Ad Operations | `ADO` |
-| AI Solutions | `AS` |
-| Team-X | `BEES` |
-| Team-Y | `FE` |
-| Team-Z | `LAB` |
-| Feedback for Mobius | `MOB` |
-| Testing | `TEST` |
+Call `list_teams` for the live list of team keys and their workflow states
+(e.g. `AI` for the AI team). Don't hardcode them — teams get added and retired.
 
 ## Troubleshooting
 

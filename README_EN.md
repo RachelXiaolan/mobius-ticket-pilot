@@ -126,7 +126,7 @@ A core feature. When you say "analyze priorities" or "check team status":
 ```
 
 5. Focus areas: In Review backlog, unassigned issues, ancient zombie issues, developer workload
-6. Sync to notes vault
+6. Optionally save it to your configured report sync path
 
 **Entirely read-only — no issues are modified.**
 
@@ -154,8 +154,8 @@ SCRIPT="$(find ~/.hermes ~/.claude ~/.codex 2>/dev/null -path '*/mobius-ticket-p
 python3 "$SCRIPT" list-active          # List active issues
 python3 "$SCRIPT" get AI-1234          # Get single issue
 python3 "$SCRIPT" get AI-1234 --comments   # With comments
-python3 "$SCRIPT" update-status AI-1234 "In Review"  # Change status
-python3 "$SCRIPT" add-comment AI-1234 "Starting"      # Post comment
+python3 "$SCRIPT" update-status AI-1234 --state "In Review"  # Change status
+python3 "$SCRIPT" add-comment AI-1234 --body "Starting"      # Post comment
 python3 "$SCRIPT" create "Title" --description "Body" --label "<your label>"  # Create
 python3 "$SCRIPT" search "bidding"     # Search
 python3 "$SCRIPT" team-status          # Team overview
@@ -197,8 +197,6 @@ mobius-ticket-pilot/
 │   ├── state-model.md                    # Mobius state model + comment contract
 │   ├── issue-audit-workflow.md           # Read-only team priority analysis workflow
 │   ├── mcp-setup-guide.md               # MCP Server multi-client config guide
-│   ├── web-ui-navigation-analysis.md     # Mobius frontend navigation structure
-│   ├── frontend-codebase.md              # Mobius frontend codebase map (for PRs)
 │   └── agent-automation.md               # Agent automation field pitfalls (delegatedAgentId)
 └── scripts/
     ├── auto_progress.py                  # 🆕 Auto state+comment (start/progress/blocker/review/done)

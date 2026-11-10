@@ -38,18 +38,24 @@ Last verified: YYYY-MM-DD
 ## Mobius
 
 - Instance: mobius.feedmob.com
-- Default team: ai-team (AI)
+- Default team: <team name>
 - Default team key: AI
-- Default team ID: <uuid>   # mode B only
 - User name: <name>
-- Default project: AI team Action
-- Default project ID: <uuid>   # mode B only
+- Default project: <project name>
 - Default labels: <comma-separated>
 - Status mapping:
   - Start: In Progress
   - Review: In Review
   - Complete: Done
   - Blocked: <team status or blank>
+
+## Analysis
+
+- Key people:            # who to break out in team-priority reports (local only)
+  - <name>: <what to watch, e.g. highest load>
+- Leadership:            # whose new issues count as "new direction"
+  - <name>
+- Report sync path: <optional folder, e.g. a notes vault>
 
 ## Auth Method
 
@@ -61,6 +67,9 @@ Last verified: YYYY-MM-DD
 ```
 
 ## Never Store
+
+Team-specific IDs for REST scripts go in `~/.mobius-ticket-pilot/ids.json`
+(see SKILL.md → *Team-specific IDs*). Both files stay local — never commit them.
 
 Never write these to `settings.md` or any file:
 

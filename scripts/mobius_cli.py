@@ -28,30 +28,36 @@ from datetime import datetime, timezone
 
 BASE_URL = "https://mobius.feedmob.com"
 
-# Cached IDs (ai-team AI as of 2026-07-23)
-STATE_IDS = {
-    "backlog": "<id>",
-    "todo": "<id>",
-    "in_progress": "<id>",
-    "in review": "<id>",
-    "done": "<id>",
-    "canceled": "<id>",
-    "duplicate": "<id>",
-}
+# Workspace IDs are local, non-secret data — kept out of this repo.
+# See SKILL.md → "Team-specific IDs" for the file format.
+IDS_PATH = os.path.expanduser(os.environ.get("MOBIUS_IDS_FILE", "~/.mobius-ticket-pilot/ids.json"))
 
-TEAM_AI = "<id>"
 
-LABEL_NAMES = {
-    "the user": "<id>",
-    "<your label>": "<id>",
-    "Teammate-B": "<id>",
-    "Teammate-C": "<id>",
-    "Teammate-A": "<id>",
-    "Teammate-D": "<id>",
-    "Teammate-E": "<id>",
-    "Lead": "<id>",
-    "Teammate-F": "<id>",
-}
+def load_ids():
+    """Load local workspace IDs (team, states, labels). Missing file = empty."""
+    try:
+        with open(IDS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"WARNING: {IDS_PATH} is not valid JSON ({e}); ignoring it.", file=sys.stderr)
+        return {}
+
+
+IDS = load_ids()
+STATE_IDS = {k.lower(): v for k, v in IDS.get("states", {}).items()}
+LABEL_NAMES = {k.lower(): v for k, v in IDS.get("labels", {}).items()}
+TEAM_ID = IDS.get("team_id")
+
+
+def team_id(override=None):
+    """Team UUID from --team, else ids.json."""
+    tid = override or TEAM_ID
+    if not tid:
+        print(f"ERROR: no team ID. Pass --team <uuid> or set team_id in {IDS_PATH}.", file=sys.stderr)
+        sys.exit(1)
+    return tid
 
 
 def get_key():
@@ -96,12 +102,12 @@ def resolve_state_id(state_name):
     if key in STATE_IDS:
         return STATE_IDS[key]
     # Try to discover from existing issues
-    issues = api("GET", f"/api/issues?teamId={TEAM_AI}&limit=5")
+    issues = api("GET", f"/api/issues?teamId={team_id()}&limit=50")
     for i in issues:
         s = i.get("state", {})
         if s.get("name", "").lower() == key:
             return s["id"]
-    print(f"ERROR: Unknown state '{state_name}'. Known: {', '.join(STATE_IDS.keys())}", file=sys.stderr)
+    print(f"ERROR: Unknown state '{state_name}'. Known: {', '.join(STATE_IDS.keys()) or '(none in ids.json)'}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -125,8 +131,8 @@ def issue_url(identifier):
 
 
 def cmd_list_active(args):
-    team_id = args.team or TEAM_AI
-    issues = api("GET", f"/api/issues?teamId={team_id}&limit=500")
+    tid = team_id(args.team)
+    issues = api("GET", f"/api/issues?teamId={tid}&limit=500")
     active = [i for i in issues if i["state"]["type"] not in ("completed", "canceled", "duplicate")]
     active.sort(key=lambda x: x.get("createdAt", ""))
 
@@ -179,15 +185,15 @@ def cmd_get(args):
 
 
 def cmd_search(args):
-    issues = api("GET", f"/api/issues?q={urllib.parse.quote(args.query)}&teamId={TEAM_AI}&limit=50")
+    issues = api("GET", f"/api/issues?q={urllib.parse.quote(args.query)}&teamId={team_id()}&limit=50")
     print(f"Search '{args.query}': {len(issues)} results\n")
     for i in issues[:20]:
         print(f"{i['identifier']:8s} | {i['state']['name']:12s} | {i['title'][:80]}")
 
 
 def cmd_team_status(args):
-    team_id = args.team or TEAM_AI
-    issues = api("GET", f"/api/issues?teamId={team_id}&limit=500")
+    tid = team_id(args.team)
+    issues = api("GET", f"/api/issues?teamId={tid}&limit=500")
     active = [i for i in issues if i["state"]["type"] not in ("completed", "canceled", "duplicate")]
     now = datetime.now(timezone.utc)
 
@@ -222,11 +228,11 @@ def cmd_team_status(args):
 
 
 def cmd_create(args):
-    state_id = STATE_IDS["todo"]
+    state_id = resolve_state_id("todo")
     payload = {
         "title": args.title,
         "description": args.description or "",
-        "teamId": TEAM_AI,
+        "teamId": team_id(),
         "stateId": state_id,
     }
 
@@ -298,7 +304,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("list-active", help="List active issues")
-    p.add_argument("--team", default=None, help="Team UUID (default: ai-team AI)")
+    p.add_argument("--team", default=None, help="Team UUID (default: team_id in ids.json)")
     p.set_defaults(func=cmd_list_active)
 
     p = sub.add_parser("get", help="Get issue detail")
@@ -317,7 +323,7 @@ def main():
     p = sub.add_parser("create", help="Create new issue")
     p.add_argument("title", help="Issue title")
     p.add_argument("--description", default="", help="Issue description")
-    p.add_argument("--label", default=None, help="Label name (e.g. '<your label>')")
+    p.add_argument("--label", default=None, help="Label name (e.g. 'Alice')")
     p.set_defaults(func=cmd_create)
 
     p = sub.add_parser("update-status", help="Change issue state")

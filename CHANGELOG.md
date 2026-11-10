@@ -18,16 +18,29 @@ All notable changes to this project will be documented in this file.
 - `issue-audit-workflow.md`: mode A fetching with cursor pagination.
 
 ### Changed
-- Team prefixes updated to the live list (AI, ADO, AS, BEES, FE, LAB, MOB, TEST);
-  `DATA-` / `INT-` / `PLT-` marked stale.
+- Team prefixes: hardcoded table replaced by `list_teams` / `GET /api/teams`
+  (the old list was stale).
 - Pagination / search / name-filter pitfalls now say which mode they apply to
   (MCP: `query`, `cursor`, max 200 per page; REST: `q`, no cursor).
 - Delegation pitfall covers MCP `delegateToEmail` as well as REST `delegatedAgentId`.
-- `auto_progress.py` / `mobius_cli.py` documented as mode B tools (ai-team only).
+- `auto_progress.py` / `mobius_cli.py` documented as mode B tools.
 - Onboarding: verify with `whoami`; settings record auth method and team key.
 - READMEs: OAuth setup is option A, API token is option B.
 
+### Privacy
+- Removed workspace-internal data from the repo: colleague names and workload notes,
+  team/state/label/project UUIDs, agent emails and token prefixes, internal model-proxy
+  details, real issue numbers/titles, and personal vault paths.
+- Team-specific IDs now live in a local `~/.mobius-ticket-pilot/ids.json`; key people,
+  leadership and report sync path in the local `settings.md`. Neither is committed.
+- `references/frontend-codebase.md` and `references/web-ui-navigation-analysis.md`
+  (maps of the private Mobius codebase/UI) removed; keep such notes in
+  `~/.mobius-ticket-pilot/notes/`.
+- Scripts read IDs from `ids.json` and fall back to API lookups; `auto_progress.py`
+  discovers state IDs from the issue's own team, so it is no longer limited to one team.
+
 ### Fixed
+- CLI examples now match the real flags (`update-status … --state`, `add-comment … --body`).
 - `install.sh`: `--agent claude,codex` comma lists now work (README already promised it).
 - `install.sh`: without git it now downloads the full repo tarball; before, it fetched
   only 4 files and missed `auto_progress.py` and most references.
@@ -48,16 +61,16 @@ All notable changes to this project will be documented in this file.
 ## [1.0.2] - 2026-07-24
 
 ### Added
-- `references/issue-audit-workflow.md` — complete read-only team priority analysis workflow: batch fetching, classification patterns, 8-column report format, per-person breakdown, notes sync, false-overlap detection rule
+- `references/issue-audit-workflow.md` — complete read-only team priority analysis workflow: batch fetching, classification patterns, 8-column report format, per-person breakdown, report sync, false-overlap detection rule
 - `references/mcp-setup-guide.md` — full Mobius MCP server setup guide: 5 clients (Hermes, Claude Desktop, Cursor, Cline, Continue), all 23 tools documented, AI quick-setup prompt, troubleshooting
 - `references/web-ui-navigation-analysis.md` — Mobius web UI navigation structure extracted from Next.js i18n bundle, page overlap diagnosis, redesign proposal
-- `references/frontend-codebase.md` — file map for contributing to the Mobius frontend repo (`<private Mobius repo>`)
+- `references/frontend-codebase.md` — file map for contributing to the Mobius frontend repo
 - `references/agent-automation.md` — `delegatedAgentId` tripwire documentation: setting this field triggers autonomous AI triage with irreversible side effects
 - `scripts/mobius_cli.py` — Python CLI helper for common Mobius operations
 - SKILL.md: Team Visibility section with 8-column report format spec
 - SKILL.md: Mobius MCP Server section (23 tools, comparison table vs REST)
 - SKILL.md: Issue overlap classification pitfall (must read comments before judging overlap)
-- SKILL.md: `delegatedAgentId` pitfall (auto-creates sub-issues, learned the hard way on AI-1234)
+- SKILL.md: `delegatedAgentId` pitfall (auto-creates sub-issues, learned the hard way on a real issue)
 
 ### Fixed
 - Web UI links must use `/issue/AI-XXXX` not `/all/AI-XXXX` (board view shows blank)

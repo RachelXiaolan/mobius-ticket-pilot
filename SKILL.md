@@ -24,7 +24,7 @@ tags: [Mobius, FeedMob, Issues, Project Management, Automation, Internal Tools]
 ## Overview
 
 Read and manage issues on **Mobius** — FeedMob's internal issue tracking system
-(built by Teammate-A, replacing Linear for ai-team).
+(replaced Linear for several FeedMob teams).
 
 - **Mobius** = task control plane AND artifact store (no GitHub sync needed).
 - **This skill** = read issues, post comments, update status, analyze priorities,
@@ -172,46 +172,31 @@ Mobius uses 6 state types (same conceptual model as Linear):
 Always look up the state ID from the issue's `state.id` field, or query
 existing issues to discover the UUIDs.
 
-### ai-team (AI) Known State IDs
+### Team-specific IDs (mode B only)
 
-```
-Backlog:      <id>
-Todo:         <id>
-In Progress:  <id>
-In Review:    <id>
-Done:         <id>
-Canceled:     <id>
-Duplicate:    <id>
+REST writes need UUIDs (team, state, label, project). **They are not stored in
+this repo** — they are workspace-internal. Keep them in a local, non-secret file:
+
+```text
+~/.mobius-ticket-pilot/ids.json   (chmod 600, never commit)
 ```
 
-> **⚠️ These IDs are specific to the ai-team (AI) workspace as of 2026-07-23.**
-> If Mobius is re-deployed or a new team is added, these UUIDs will change.
-> Always verify by querying an existing issue first.
-> **Revalidation:** if `PATCH stateId` returns 400, re-discover state IDs by
-> `GET /api/issues?teamId=<uuid>&stateType=<type>` and reading `state.id`.
-
-### Known Team/Label/Project IDs
-
+```json
+{
+  "team_key": "AI",
+  "team_id": "<team uuid>",
+  "project": {"name": "<default project>", "id": "<project uuid>"},
+  "states": {"backlog": "<uuid>", "todo": "<uuid>", "in_progress": "<uuid>",
+             "in review": "<uuid>", "done": "<uuid>", "canceled": "<uuid>"},
+  "labels": {"<label name, lowercase>": "<uuid>"}
+}
 ```
-Team ai-team (AI):    <id>
-Project AI team Action: <id>
 
-Labels (by name):
-  <your label>:   <id>
-  Teammate-B:         <id>
-  Teammate-C:        <id>
-  Teammate-A:   <id>
-  Teammate-D:       <id>
-  Teammate-E:       <id>
-  Lead:         <id>
-  Teammate-F:     <id>
-  全员:         <id>
-  未分配:       <id>
-  Teammate-G:         <id>
-  Bug:         <id>
-  Urgent:      <id>
-  Feature:     <id>
-```
+Fill it during onboarding (mode B): team/label/project IDs from `GET /api/teams`,
+`/api/labels`, `/api/projects`; state IDs from `state.id` in
+`GET /api/issues?teamId=<uuid>&limit=50`. **State IDs are per-team** and change if
+Mobius is re-deployed — if `PATCH stateId` returns 400, re-discover them.
+The scripts read this file and fall back to API lookups when an entry is missing.
 
 ## CLI Helper (mode B)
 
@@ -222,8 +207,8 @@ SCRIPT="$(find ~/.hermes ~/.claude ~/.codex ~/.openclaw 2>/dev/null -path '*/mob
 python3 "$SCRIPT" list-active
 python3 "$SCRIPT" get AI-1234
 python3 "$SCRIPT" get AI-1234 --comments
-python3 "$SCRIPT" update-status AI-1234 "In Review"
-python3 "$SCRIPT" add-comment AI-1234 "Starting work on this"
+python3 "$SCRIPT" update-status AI-1234 --state "In Review"
+python3 "$SCRIPT" add-comment AI-1234 --body "Starting work on this"
 python3 "$SCRIPT" create "issue title" --description "body" --label "<your label>"
 python3 "$SCRIPT" search "bidding"
 python3 "$SCRIPT" team-status
@@ -248,20 +233,20 @@ See `scripts/mobius_cli.py` for all commands.
 
 ## Team Naming Conventions
 
-FeedMob ai-team (AI) issue naming pattern:
+Example team convention (AI team) — confirm your own team's pattern by sampling:
 
 ```text
 #YYYYMMDD-NameN 描述内容
 ```
 
 Examples:
-- `#20260101-Name-01 做一个mcp的使用说明 doc（中英文）`
-- `#20260101-Name-03 claude code 规范先出一版`
+- `#20260101-Name-01 写一份 MCP 使用说明（中英文）`
+- `#20260102-Name-03 整理团队开发规范初版`
 
 Description body:
 ```text
 提出日期: YYYY-MM-DD
-备注: 来源：... Action（... ）。
+备注: 来源：...
 ```
 
 **Always sample 10+ recent issues first** to confirm the pattern before creating.
@@ -274,7 +259,7 @@ use **labels** to indicate all participants.
 - **Default assignee = current user** (from settings). In mode A pass
   `assigneeEmail` explicitly — `create_issue` leaves the issue unassigned (Inbox
   triage queue) when it is omitted. Only assign someone else if the user named them.
-- **Default label = user's personal label** (e.g. `<your label>`). Always attach.
+- **Default label = user's personal label** (from settings, e.g. `<your label>`). Always attach.
 - **If the issue involves other teammates** — ask which labels to add. Do not guess.
 - **Never remove or change someone else's label/assignee** without asking.
 
@@ -326,8 +311,8 @@ A person (OAuth sign-in) does not add these trailers.
 
 Use the script — do NOT manually PATCH state + POST comment separately. It does
 both and ensures no step is forgotten. **Limitation:** its state IDs are
-hardcoded for ai-team (`AI-`); for other teams, use mode A or PATCH with the
-team's own state IDs.
+read from `~/.mobius-ticket-pilot/ids.json` (one team); for other teams, use
+mode A.
 
 ```bash
 SCRIPT="$(find ~/.hermes ~/.claude ~/.codex ~/.openclaw 2>/dev/null -path '*/mobius-ticket-pilot/scripts/auto_progress.py' | head -1)"
@@ -336,7 +321,7 @@ SCRIPT="$(find ~/.hermes ~/.claude ~/.codex ~/.openclaw 2>/dev/null -path '*/mob
 python3 "$SCRIPT" start AI-1234 --scope "写 MCP 配置文档" --plan "先调研现有文档"
 
 # 💬 Phase milestone → comment only (no state change)
-python3 "$SCRIPT" progress AI-1234 --summary "414行文档完成" --output "notes已同步" --next "提交PR"
+python3 "$SCRIPT" progress AI-1234 --summary "文档初稿完成" --output "已同步到笔记" --next "提交PR"
 
 # 🛑 Stuck → blocker comment (no state change)
 python3 "$SCRIPT" blocker AI-1234 --error "tsc有92个错误" --check "检查@types/node是否缺失"
@@ -409,14 +394,14 @@ Quick summary:
 2. Filter active (exclude `completed`, `canceled`, `duplicate`) — in mode A the
    per-`stateType` queries already do this.
 3. Group by assignee AND labels (Mobius assignee is single-user; labels carry multi-person ownership).
-4. Classify patterns (stuck, ancient, clusters, unassigned, overloaded, Lead's new direction).
+4. Classify patterns (stuck, ancient, clusters, unassigned, overloaded, new direction from leadership).
 5. **Use 8-column tables for issues you DO include** — but the report is analysis-driven,
    NOT an exhaustive listing. Only include issues that are stuck, In Review, unassigned,
    ancient (>60d), overlapping, key developer items, or notable shifts from last report.
 6. Group by **what needs attention**: In Review (待验收) → 未分配 → per-person deep dives
-   (Teammate-B/Teammate-A/Teammate-C — their stuck/old items only, not everything).
+   (the *Key people* in settings — their stuck/old items only, not everything).
 7. Add a Top 5 summary table at the end.
-8. Sync to `<notes-vault>/<notes folder>/AI-team-Issue优先级分析-YYYYMMDD-Mobius.md`.
+8. If settings define a *Report sync path*, save the report there (e.g. a notes vault).
 
 ### ⚠️ Output format — ANALYSIS-DRIVEN, NOT EXHAUSTIVE LISTING
 
@@ -437,12 +422,12 @@ decisions**, NOT a data export. Two hard rules:
 - **建议处理方式**: concrete next action (验收→Done, 分配给X, 确认Cancel, 正常推进, etc.)
 
 Organize by what needs attention: In Review (待验收) → 未分配 → per-person deep dives
-(Teammate-B/Teammate-A/Teammate-C — their stuck/old items only). Then a short Top 5 table at the end
+(Key people from settings — their stuck/old items only). Then a short Top 5 table at the end
 with the most actionable items. Do NOT list all 70+ issues — this is an analysis report,
 not a data export.
 
 For the full audit workflow (batch fetching, classification patterns, tiered report
-format, per-person breakdown, and notes sync), read
+format, per-person breakdown, and report sync), read
 **`references/issue-audit-workflow.md`**.
 
 ### Label-as-assignee convention
@@ -452,16 +437,18 @@ all participants. Always report label-based owners alongside the assignee:
 
 | Assignee | Labels | Interpretation |
 |----------|--------|---------------|
-| Teammate-C | [Teammate-C] | Sole owner |
-| null | [Teammate-B, the user] | Multi-person — both owners |
-| Teammate-A | [Teammate-A, Teammate-B] | Teammate-A primary, Teammate-B collaborator |
+| Alice | [Alice] | Sole owner |
+| null | [Bob, Carol] | Multi-person — both owners |
+| Alice | [Alice, Bob] | Alice primary, Bob collaborator |
 | null | [未分配] | Truly unassigned — flag |
 
 ### Key people to track
 
-For FeedMob ai-team (AI), always break out: **Teammate-A** (highest load, Mobius dev),
-**Teammate-B** (accumulates issues), **Teammate-C** (most ancient stuck issues), **Teammate-D** (long-stuck
-research), **the user** (the user — note her own backlog), and **Unassigned** (multi-person tasks).
+List the people to always break out under *Key people* in
+`~/.mobius-ticket-pilot/settings.md` (name + a short note on what to watch, e.g.
+"highest load" or "long-stuck research"). Always add **the user** (their own
+backlog) and **Unassigned** (multi-person tasks). Keep these notes local — they
+are about colleagues and do not belong in a shared repo.
 
 ## Credential Rules
 
@@ -508,7 +495,7 @@ Read `references/onboarding-settings.md` for the exact settings format.
 ### AI Background Enrichment
 
 Mobius auto-generates an "AI 理解" (AI Understanding) section in issue descriptions,
-derived from meeting transcripts (meeting-notes tool). This provides rich context that Linear
+derived from meeting transcripts. This provides rich context that Linear
 didn't have. Always read the full description when analyzing an issue.
 
 ### Issue Sources
@@ -525,21 +512,10 @@ Canceled quickly after testing.
 
 ### Team Prefixes
 
-As of 2026-11-10 (`list_teams`). Teams get added and retired — re-check with
-`list_teams` (mode A) or `GET /api/teams` (mode B) before relying on a prefix.
-
-| Prefix | Team |
-|--------|------|
-| `AI-` | ai-team (AI) — only team with a `Duplicate` state |
-| `ADO-` | Ad Operations |
-| `AS-` | AI Solutions |
-| `BEES-` | Team-X |
-| `FE-` | Team-Y |
-| `LAB-` | Team-Z |
-| `MOB-` | Feedback for Mobius |
-| `TEST-` | Testing (Teammate-A playbook tests) |
-
-Older references to `DATA-` / `INT-` / `PLT-` are stale — those teams no longer exist.
+Each team has its own identifier prefix (e.g. `AI-` for the AI team, `TEST-` for
+playbook tests). Teams get added and retired — get the live list with `list_teams`
+(mode A) or `GET /api/teams` (mode B) instead of relying on a hardcoded table.
+The AI team is the only one with a `Duplicate` state.
 
 ## Mobius MCP Server (HTTP endpoint)
 
@@ -619,9 +595,8 @@ Mobius is a Next.js App Router SPA. Saving a page as HTML yields only
 "Loading Mobius…" — real content is rendered client-side from JS chunks.
 To extract page structure, navigation labels, or i18n strings, fetch the JS
 chunks directly and regex the i18n dictionary out of the bundle.
-See `references/web-ui-navigation-analysis.md` for the full technique and
-extracted structure, and `references/frontend-codebase.md` for the codebase
-file map when you're ready to actually make UI changes.
+Workspace-internal notes on the web UI and the Mobius codebase, if the user keeps
+any, live in `~/.mobius-ticket-pilot/notes/` — not in this repo.
 
 ### Web UI links MUST use `/issue/`, not `/all/`
 
@@ -633,7 +608,7 @@ https://mobius.feedmob.com/issue/AI-1234    ← ✅ correct (issue detail page)
 https://mobius.feedmob.com/all/AI-1234      ← ❌ WRONG (board view — blank/error)
 ```
 
-**Always generate `/issue/AI-XXXX` links** in reports, comments, and notes files.
+**Always generate `/issue/AI-XXXX` links** in reports, comments, and notes.
 `/all/AI-XXXX` links open to a blank page.
 
 ### Pagination differs by mode
@@ -651,9 +626,9 @@ https://mobius.feedmob.com/all/AI-1234      ← ❌ WRONG (board view — blank/
 
 ### REST: state/label name filters don't work
 
-`?state=todo` and `?label=Teammate-B` return ALL issues regardless.
+`?state=todo` and `?label=Alice` return ALL issues regardless.
 Use `?stateType=started` and `?labelId=<uuid>` for real filtering.
-(MCP `list_issues` does accept names: `stateNames=["Todo"]`, `labels=["Teammate-B"]`.)
+(MCP `list_issues` does accept names: `stateNames=["Todo"]`, `labels=["Alice"]`.)
 
 ### REST: `?include=comments` only works on single issue detail
 
@@ -688,14 +663,14 @@ curl -X PATCH -d '{"delegatedAgentId":"<agent_uuid>"}' \
 
 **Do NOT use production issues to probe/explore this feature.** If you need to understand agent delegation, create a throwaway `TEST-` issue first, or observe it on an issue where triage is already desired. Unsetting `delegatedAgentId: null` after the fact stops future triage but does NOT undo the sub-issues/comments already created — those must be cleaned up manually (DELETE each sub-issue + post an explanatory comment).
 
-This was learned the hard way: an exploratory PATCH on AI-1234 auto-generated AI-1234 within ~30s, requiring cleanup + an apology comment. Treat any write that touches agent/automation fields as a **write with side effects**, not a harmless probe.
+This was learned the hard way: an exploratory PATCH on a real issue auto-generated a sub-issue within ~30s, requiring cleanup + an apology comment. Treat any write that touches agent/automation fields as a **write with side effects**, not a harmless probe.
 
 ### Issue overlap classification MUST read comments first
 
 When flagging two issues as "overlapping" or "merge candidates", you MUST read the
 full descriptions and at least the last 3 comments on both issues before concluding.
-Title similarity alone is misleading — e.g. two issues both mentioning "a vendor
-MCP" turned out to be completely different tasks (one = build API wrapper, the other =
+Title similarity alone is misleading — e.g. two issues both mentioning the same
+vendor's MCP turned out to be completely different tasks (one = build API wrapper, the other =
 compare official MCP vs self-built).
 
 **Rule:** Never recommend Cancel/merge based on title keywords alone. Always run:
@@ -735,12 +710,6 @@ This handles Unicode/JSON escaping correctly and returns the full API response
 for error checking. The CLI helper is fine for read operations (`get`, `list-active`,
 `search`, `team-status`).
 
-### State IDs are per-team and may change
-
-The state UUIDs documented above are specific to ai-team (AI) as of 2026-07-23.
-If Mobius is re-deployed, these will change. Always verify by reading an
-existing issue's `state.id` before attempting a PATCH.
-
 ## Stop Conditions
 
 Stop and ask the user when:
@@ -752,12 +721,10 @@ Stop and ask the user when:
 
 ## Resources
 
-- `scripts/auto_progress.py` — **mode B: MUST USE at every lifecycle point.** Automates state transition + formatted comment in one command (start/progress/blocker/review/done). ai-team (`AI-`) only. In mode A follow the MCP templates in *Lifecycle Progress Tracking*.
+- `scripts/auto_progress.py` — **mode B: MUST USE at every lifecycle point.** Automates state transition + formatted comment in one command (start/progress/blocker/review/done). Reads IDs from `~/.mobius-ticket-pilot/ids.json`. In mode A follow the MCP templates in *Lifecycle Progress Tracking*.
 - `scripts/mobius_cli.py` — mode B: Python CLI for common Mobius operations.
 - `references/onboarding-settings.md` — first-run onboarding and settings format.
 - `references/state-model.md` — Mobius state model and comment contract.
-- `references/issue-audit-workflow.md` — read-only team priority analysis: batch fetching, classification patterns, tiered report format, per-person breakdown, notes sync, ID migration notes. Includes false-overlap detection rule.
+- `references/issue-audit-workflow.md` — read-only team priority analysis: batch fetching, classification patterns, tiered report format, per-person breakdown, report sync, ID migration notes. Includes false-overlap detection rule.
 - `references/mcp-setup-guide.md` — full Mobius MCP server setup: multi-client configs (Hermes, Claude Desktop, Cursor, Cline, Continue), OAuth sign-in, agent pairing, all 32 tools, AI quick-setup prompt, troubleshooting.
-- `references/web-ui-navigation-analysis.md` — Mobius web UI navigation structure (extracted from Next.js i18n bundle), page overlap diagnosis, 3-step redesign proposal for the Developers/Guide/Settings config flow. Use when proposing UI changes or debugging page routes.
-- `references/frontend-codebase.md` — file map for contributing code to the Mobius repo (`<private Mobius repo>`): where pages/components/i18n live, i18n pattern, guide-content structure, verification commands, PR conventions. Read BEFORE editing the Mobius frontend.
 - `references/agent-automation.md` — `/api/agents`, `/api/settings`, and the `delegatedAgentId` tripwire. Read BEFORE any exploratory PATCH on agent/triage fields — setting this field on a production issue auto-creates sub-issues and rewrites the description.

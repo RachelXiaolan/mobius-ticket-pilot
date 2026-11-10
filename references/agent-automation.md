@@ -1,6 +1,6 @@
 # Mobius Agent & Automation Endpoints
 
-Discovered while exploring Mobius for AI-1234. These endpoints are NOT in the
+Discovered while exploring Mobius agent delegation. These endpoints are NOT in the
 main API table and are easy to trigger by accident.
 
 ## Endpoints
@@ -11,17 +11,15 @@ Returns the workspace's AI agents. Both are bots (`isBot: true`).
 
 ```json
 [
-  {"id":"<id>","name":"Mobius Agent",
-   "email":"<agent email>","title":"Agent (Beta)","online":true,
-   "liveTokenCount":1,"tokenPrefix":"mob_…"},
-  {"id":"<id>","name":"<second agent>",
-   "email":"<agent email>","title":"Agent (Beta)","online":false,
-   "tokenPrefix":"mob_…"}
+  {"id":"<agent id>","name":"Mobius Agent","email":"<agent email>",
+   "title":"Agent (Beta)","online":true,"liveTokenCount":1,"tokenPrefix":"mob_…"},
+  {"id":"<agent id>","name":"<second agent>","email":"<agent email>",
+   "title":"Agent (Beta)","online":false,"tokenPrefix":"mob_…"}
 ]
 ```
 
 - `Mobius Agent` is the triage/automation bot (online, active).
-- `<second agent>` is a second agent (often offline).
+- Other agents may be listed (often offline).
 - Sub-routes like `/api/agents/{id}` and `/api/agents/{id}/issues` return 404
   (Next.js catch-all) — only the bare `/api/agents` list works.
 
@@ -29,21 +27,20 @@ Returns the workspace's AI agents. Both are bots (`isBot: true`).
 
 ```json
 {
-  "provider": "openai",
-  "effectiveBaseUrl": "https://<internal model proxy>/v1",
+  "provider": "<provider>",
+  "effectiveBaseUrl": "<internal model proxy URL>",
   "effectiveModel": "<model>",
   "apiKeySet": true,
   "enabled": true,
   "autoTriage": false,
   "slackWebhookUrl": "",
   "slackConfigured": false,
-  "defaults": {"baseUrl":"https://api.anthropic.com","model":"claude-opus-4-8"},
-  "models": [{"id":"claude-opus-4-8",...}, ...]
+  "defaults": {"baseUrl": "...", "model": "..."},
+  "models": [ ... ]
 }
 ```
 
-- Underlying model is **<model>** via a workspace-hosted model proxy
-  (`<internal model proxy>/v1`), NOT raw OpenAI/Anthropic.
+- The agent's model runs behind a workspace-hosted proxy (`effectiveBaseUrl`), not a raw vendor API.
 - `enabled: true` = agent is globally active. `autoTriage: false` means the
   agent does NOT triage every issue automatically — it only acts when an issue
   has a `delegatedAgentId` pointing at it (see pitfall in SKILL.md).
@@ -81,8 +78,8 @@ curl -X POST -H "Authorization: Bearer $MOBIUS_API_KEY" \
 There is **no separate `/api/chat` or `/api/conversations` endpoint.** Mobius's
 human↔agent collaboration model is: **the issue comment thread IS the chat.**
 Agents participate by posting comments (as bot users) and by mutating issue
-fields. This contrasts with dedicated chat tools (chat-first tool, Slack) which have
+fields. This contrasts with dedicated chat tools (e.g. Slack) which have
 real-time message channels separate from task state.
 
-For the chat-first tool-vs-Mobius agent-collaboration comparison (why chat-first tool is
-"native agent" and Mobius is "agent-attached"), see the AI-1234 ticket notes.
+In short: chat-first tools are "agent-native"; Mobius is "agent-attached" to
+issues.

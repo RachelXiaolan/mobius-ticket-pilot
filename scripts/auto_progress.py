@@ -33,16 +33,25 @@ from datetime import datetime, timezone
 
 BASE_URL = "https://mobius.feedmob.com"
 
-# ai-team (AI) state IDs as of 2026-07-23
-STATE_IDS = {
-    "backlog": "<id>",
-    "todo": "<id>",
-    "in_progress": "<id>",
-    "in review": "<id>",
-    "done": "<id>",
-    "canceled": "<id>",
-    "duplicate": "<id>",
-}
+# Workspace IDs are local, non-secret data — kept out of this repo.
+# See SKILL.md → "Team-specific IDs" for the file format.
+IDS_PATH = os.path.expanduser(os.environ.get("MOBIUS_IDS_FILE", "~/.mobius-ticket-pilot/ids.json"))
+
+
+def load_ids():
+    """Load local workspace IDs (team, states, labels). Missing file = empty."""
+    try:
+        with open(IDS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"WARNING: {IDS_PATH} is not valid JSON ({e}); ignoring it.", file=sys.stderr)
+        return {}
+
+
+IDS = load_ids()
+STATE_IDS = {k.lower(): v for k, v in IDS.get("states", {}).items()}
 
 
 def get_key():
@@ -77,10 +86,24 @@ def get_issue(identifier):
     return api("GET", f"/api/issues/{identifier}")
 
 
-def set_state(issue_uuid, state_name):
-    """PATCH issue to a new state."""
+def discover_state_id(team_uuid, state_key):
+    """Find a state's UUID by name from the team's existing issues."""
+    if not team_uuid:
+        return None
+    wanted = state_key.replace("_", " ")
+    for i in api("GET", f"/api/issues?teamId={team_uuid}&limit=200") or []:
+        s = i.get("state") or {}
+        if s.get("name", "").lower() == wanted:
+            return s.get("id")
+    return None
+
+
+def set_state(issue, state_name):
+    """PATCH issue to a new state (ids.json first, then discovery)."""
+    issue_uuid = issue["id"]
     state_key = state_name.lower().strip()
-    state_id = STATE_IDS.get(state_key)
+    team_uuid = issue.get("teamId") or (issue.get("team") or {}).get("id")
+    state_id = STATE_IDS.get(state_key) or discover_state_id(team_uuid, state_key)
     if not state_id:
         print(f"ERROR: Unknown state '{state_name}'", file=sys.stderr)
         sys.exit(1)
@@ -111,7 +134,7 @@ def do_start(args):
 
     # Change state to In Progress (skip if already there)
     if current_state != "In Progress":
-        set_state(iid, "in_progress")
+        set_state(issue, "in_progress")
         print(f"📋 State: {current_state} → In Progress")
     else:
         print(f"📋 State: already In Progress (skipping)")
@@ -190,7 +213,7 @@ def do_review(args):
     current_state = issue.get("state", {}).get("name", "")
 
     if current_state != "In Review":
-        set_state(iid, "in review")
+        set_state(issue, "in review")
         print(f"📋 State: {current_state} → In Review")
     else:
         print(f"📋 State: already In Review (skipping)")
@@ -219,7 +242,7 @@ def do_done(args):
     current_state = issue.get("state", {}).get("name", "")
 
     if current_state != "Done":
-        set_state(iid, "done")
+        set_state(issue, "done")
         print(f"📋 State: {current_state} → Done")
     else:
         print(f"📋 State: already Done (skipping)")

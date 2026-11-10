@@ -125,7 +125,7 @@ Agent 会拉取所有活跃 Issue，分析哪些卡住了、哪些值得推，�
 ```
 
 5. 重点关注：In Review 堆积、未分配 Issue、古老僵尸 Issue、开发人员负载
-6. 同步到 notes vault
+6. 如果设置了报告同步路径，保存一份过去
 
 **全程只读，不会修改任何 Issue。**
 
@@ -155,8 +155,8 @@ SCRIPT="$(find ~/.hermes ~/.claude ~/.codex 2>/dev/null -path '*/mobius-ticket-p
 python3 "$SCRIPT" list-active          # 列出活跃 issue
 python3 "$SCRIPT" get AI-1234          # 查看单个 issue
 python3 "$SCRIPT" get AI-1234 --comments   # 含评论
-python3 "$SCRIPT" update-status AI-1234 "In Review"  # 改状态
-python3 "$SCRIPT" add-comment AI-1234 "开始处理"      # 发评论
+python3 "$SCRIPT" update-status AI-1234 --state "In Review"  # 改状态
+python3 "$SCRIPT" add-comment AI-1234 --body "开始处理"      # 发评论
 python3 "$SCRIPT" create "issue标题" --description "内容" --label "<your label>"  # 建issue
 python3 "$SCRIPT" search "bidding"     # 搜索
 python3 "$SCRIPT" team-status          # 团队状态总览
@@ -218,8 +218,6 @@ mobius-ticket-pilot/
 │   ├── state-model.md                    # Mobius 状态模型 + 评论契约
 │   ├── issue-audit-workflow.md           # 只读团队优先级分析完整流程
 │   ├── mcp-setup-guide.md               # MCP Server 多客户端配置指南
-│   ├── web-ui-navigation-analysis.md     # Mobius 前端导航结构分析
-│   ├── frontend-codebase.md              # Mobius 前端代码库地图（贡献 PR 用）
 │   └── agent-automation.md               # Agent 自动化字段陷阱（delegatedAgentId）
 └── scripts/
     ├── auto_progress.py                  # 🆕 自动状态+评论（start/progress/blocker/review/done）
