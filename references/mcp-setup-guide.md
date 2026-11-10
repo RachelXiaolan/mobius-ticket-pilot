@@ -3,27 +3,114 @@
 Full multi-client configuration reference for the Mobius MCP server.
 This is the standalone document — the SKILL.md has a condensed summary.
 
+Last verified: 2026-11-10 (32 tools, OAuth discovery live).
+
 ## Connection Details
 
 | Field | Value |
 |-------|-------|
 | Transport | Streamable HTTP (JSON-RPC over POST) |
 | URL | `https://mobius.feedmob.com/api/mcp` |
-| Auth Header | `Authorization: Bearer mob_...` |
-| Protocol version | `2024-11-05` |
+| Auth (recommended) | OAuth 2.1 — browser sign-in with your Mobius account |
+| Auth (fallback) | `Authorization: Bearer mob_...` |
 | Session required | No (stateless) |
-| Tool count | 23 |
+| Tool count | 32 |
 | Server name | `mobius` |
 
-## Getting Your Token
+## Choose an auth method
 
-1. Log in to Mobius → Settings → API & Tokens
-2. Generate new token (starts with `mob_`)
-3. Personal token = actions attributed to you; shared token = attributed to "Mobius AI"
+| You are… | Use | Why |
+|----------|-----|-----|
+| A person using an interactive MCP client (Claude Code, Claude desktop/web, Cursor, VS Code…) | **OAuth** | No token to create, copy, rotate or leak. Actions are signed as you. |
+| A headless runtime acting on its own (Hermes gateway, agent-worker, a cron loop) | **Agent pairing** → `mob_` token | Browser sign-in cannot finish headless; a paired agent gets its own identity and an append-only permission set. |
+| A script or client with no OAuth support | **Personal token** (`mob_`) | Fallback only. |
 
-## Client Configurations
+## OAuth (recommended)
 
-### Hermes Agent (`~/.hermes/config.yaml`)
+The server advertises standard MCP OAuth. Any MCP client with OAuth support
+discovers it automatically from the `401` response — you only give it the URL.
+
+| Item | Value |
+|------|-------|
+| Protected-resource metadata | `https://mobius.feedmob.com/.well-known/oauth-protected-resource` |
+| Authorization-server metadata | `https://mobius.feedmob.com/.well-known/oauth-authorization-server` |
+| Dynamic client registration | `https://mobius.feedmob.com/api/oauth/register` |
+| Grant | `authorization_code` + PKCE (`S256`), `refresh_token` |
+| Scopes | `mobius:read`, `mobius:write` |
+
+### Claude Code
+
+```bash
+claude mcp add --transport http --scope user mobius https://mobius.feedmob.com/api/mcp
+```
+
+Then in a Claude Code session: `/mcp` → `mobius` → **Authenticate** → sign in in the
+browser → back in `/mcp` it shows connected.
+
+No `claude` CLI (desktop app only)? Add the same entry by hand to the top-level
+`mcpServers` object in `~/.claude.json`, then open a **new** session and run `/mcp`:
+
+```json
+{
+  "mcpServers": {
+    "mobius": { "type": "http", "url": "https://mobius.feedmob.com/api/mcp" }
+  }
+}
+```
+
+### Claude (claude.ai web / desktop / mobile)
+
+Settings → Connectors → **Add custom connector** → name `Mobius`, URL
+`https://mobius.feedmob.com/api/mcp` → **Connect** → sign in. The connector follows
+your claude.ai account across apps.
+
+### Cursor (`mcp.json`) / VS Code / other OAuth-capable clients
+
+```json
+{
+  "mcpServers": {
+    "mobius": { "url": "https://mobius.feedmob.com/api/mcp" }
+  }
+}
+```
+
+No `headers` block — the client opens the browser sign-in on first use.
+
+### Verify
+
+Call the `whoami` tool. Expected: your own `name` / `email`, `kind: "person"`, and a
+`capabilities` object. Then `list_teams` should list the workspace's teams.
+
+## Agent pairing (headless runtimes)
+
+A runtime that runs unattended should become a Mobius **agent** with its own
+identity instead of borrowing a person's login. The flow is an OAuth-style device
+flow: the runtime shows a code, a person approves it in Mobius.
+
+The authoritative, versioned instructions are served by Mobius itself — always
+read them instead of copying from here:
+
+- MCP tool: `agent_guide` (optionally `runtime: "hermes"` / `"claude-code"` / …)
+- Or without credentials: `GET https://mobius.feedmob.com/api/agents/guide`
+
+Key rules from the guide:
+1. Ask the person what to name the agent; never invent a name.
+2. Never print the `pollToken` or the resulting `mob_` token.
+3. The person decides the agent kind (personal / team / workspace) on the approve page.
+4. Agents are **append-only**: no archive, delete, editing others' comments,
+   project management, or Mobius AI tools.
+5. A 401 after pairing means paused/revoked — stop and tell the owner.
+
+Hermes has a first-party plugin served by Mobius
+(`curl -fsSL https://mobius.feedmob.com/api/agents/plugin/hermes | tar -xz -C ~/.hermes/plugins`);
+see `agent_guide(runtime="hermes")` for the full recipe.
+
+## Personal token (fallback)
+
+1. Mobius → Settings → API & Tokens → generate a token (starts with `mob_`).
+2. Keep it in an env var or the client's secret store — never in git.
+
+### Hermes (`~/.hermes/config.yaml`)
 
 ```yaml
 mcp_servers:
@@ -34,24 +121,11 @@ mcp_servers:
     timeout: 180
 ```
 
-Restart Hermes → 23 tools registered as `mcp_mobius_*`.
+Prefer `url` + `headers` over `npx mcp-remote` + OAuth for headless gateways: an
+OAuth server that needs a browser cannot finish inside a gateway's discovery window.
 
 ### Claude Desktop (`claude_desktop_config.json`)
 
-```json
-{
-  "mcpServers": {
-    "mobius": {
-      "url": "https://mobius.feedmob.com/api/mcp",
-      "headers": {
-        "Authorization": "Bearer mob_YOUR_TOKEN"
-      }
-    }
-  }
-}
-```
-
-If native HTTP doesn't work, use mcp-remote bridge:
 ```json
 {
   "mcpServers": {
@@ -64,20 +138,7 @@ If native HTTP doesn't work, use mcp-remote bridge:
 }
 ```
 
-### Cursor (`mcp.json`)
-
-```json
-{
-  "mcpServers": {
-    "mobius": {
-      "url": "https://mobius.feedmob.com/api/mcp",
-      "headers": {
-        "Authorization": "Bearer mob_YOUR_TOKEN"
-      }
-    }
-  }
-}
-```
+(Or skip the token entirely and add a custom connector — see OAuth above.)
 
 ### Cline (`cline_mcp_settings.json`)
 
@@ -108,76 +169,98 @@ mcpServers:
 
 ## AI Agent Quick-Setup Prompt
 
-Paste this to any AI agent to have it auto-configure:
+Paste this to any AI agent to have it configure itself:
 
 ```
-I need you to add the Mobius MCP server to your configuration.
+Add the Mobius MCP server to your configuration.
 
-Connection details:
 - Transport: Streamable HTTP
 - URL: https://mobius.feedmob.com/api/mcp
-- Auth header: Authorization: Bearer <MY_MOBIUS_TOKEN>
-- Protocol version: 2024-11-05
+- Auth: OAuth (the server advertises it via its 401 response). If your client
+  supports MCP OAuth, add the URL with no auth header and let me sign in in the
+  browser. If you are a headless runtime, call GET
+  https://mobius.feedmob.com/api/agents/guide and follow its pairing steps instead.
+  Do not ask me to paste a token into chat.
 
-The server exposes 23 tools (prefixed mcp_mobius_*) for issue tracking:
-READ: list_issues, get_issue, list_teams, list_projects, list_users,
-      list_labels, list_attachments, workspace_briefing, ask_mobius
-WRITE: create_issue, update_issue, add_comment, update_comment,
-       delete_comment, archive_issue, unarchive_issue, create_project,
-       update_project, upload_attachment, delete_attachment,
-       triage_issue, add_issue_link, remove_issue_link
-
-Steps:
-1. Find your MCP server config file.
-2. Add an entry under mcp_servers named "mobius" with the URL and headers above.
-3. Restart to discover tools.
-4. Verify by calling list_teams — you should see teams like "AI", "Ad Operations".
+After connecting, call `whoami` and tell me the name, kind and readable teams it
+reports, then call `list_teams`.
 ```
 
-## All 23 MCP Tools
+## All 32 MCP Tools
 
-### Read (9)
+`*` = people only (refused to agent tokens). Unknown arguments are rejected.
+
+### Identity & guide (2)
 
 | Tool | Key Parameters |
 |------|----------------|
-| `list_issues` | `teamKey`, `stateType`, `assigneeEmail`, `labels`, `query`, `limit`, `cursor`, `sortBy` |
-| `get_issue` | `identifier` (e.g. `"AI-1234"`) |
-| `list_teams` | — |
+| `whoami` | — |
+| `agent_guide` | `runtime` |
+
+### Read (8)
+
+| Tool | Key Parameters |
+|------|----------------|
+| `list_issues` | `teamKey`, `stateType`, `stateNames`, `labels`, `assigneeEmail`, `noAssignee`, `query`, `priority`, `priorities`, `projectName`, `createdAfter/Before`, `updatedAfter/Before`, `dueAfter/Before`, `parentIdentifier`, `hasParent`, `hasChildren`, `delegatedToEmail`, `archived`, `sortBy`, `sortOrder`, `limit` (≤200), `cursor` |
+| `get_issue` | `identifier` (e.g. `"AI-1234"`) — includes comments, links, attachments, activity |
+| `list_teams` | — (keys + workflow states) |
 | `list_projects` | — |
-| `list_users` | — |
+| `list_users` | — (name + email) |
 | `list_labels` | — |
 | `list_attachments` | `identifier` |
-| `workspace_briefing` | — |
-| `ask_mobius` | `question` |
+| `read_attachment` | `id`, `maxChars` — text types only |
 
-### Write (9)
+### Write issues (4)
 
 | Tool | Key Parameters |
 |------|----------------|
 | `create_issue` | `teamKey`*, `title`*, `description`, `priority`, `labels`, `assigneeEmail`, `parentIdentifier` |
-| `update_issue` | `identifier`*, `stateName`, `priority`, `assigneeEmail`, `labels`, `dueDate`, `projectName` |
-| `add_comment` | `identifier`*, `body`* |
-| `update_comment` | `commentId`*, `body`* |
-| `delete_comment` | `commentId`* |
-| `archive_issue` | `identifier`* |
-| `unarchive_issue` | `identifier`* |
-| `create_project` | `name`*, `description`, `status`, `leadEmail`, `teamKeys` |
-| `update_project` | `name`*, `status`, `health`, `leadEmail`, `targetDate` |
+| `update_issue` | `identifier`*, `stateName`, `title`, `description`, `priority`, `assigneeEmail`, `delegateToEmail`, `labels` (replaces), `dueDate`, `projectName`, `parentIdentifier` |
+| `archive_issue`\* | `identifier` |
+| `unarchive_issue`\* | `identifier` |
 
-### Attachments & Links (4)
+### Comments (3)
 
 | Tool | Key Parameters |
 |------|----------------|
-| `upload_attachment` | `filename`*, `mimeType`*, `dataBase64` or `fileUrl`, `identifier` |
-| `delete_attachment` | `id`* |
-| `add_issue_link` | `identifier`*, `url`*, `title`, `kind` |
-| `remove_issue_link` | `id`* |
+| `add_comment` | `identifier`, `body` |
+| `update_comment`\* | `commentId`, `body` |
+| `delete_comment`\* | `commentId` |
 
-### AI Intelligence (1)
+### Links & attachments (4)
 
 | Tool | Key Parameters |
 |------|----------------|
-| `triage_issue` | `identifier`*, `apply` |
+| `add_issue_link` | `identifier`, `url`, `title`, `kind` (`pr` / `commit` / `link`) |
+| `remove_issue_link`\* | `id` |
+| `upload_attachment` | `filename`, `mimeType`, `dataBase64` or `fileUrl`, `identifier` |
+| `delete_attachment`\* | `id` |
+
+### Projects (2)
+
+| Tool | Key Parameters |
+|------|----------------|
+| `create_project`\* | `name`, `description`, `status`, `leadEmail`, `teamKeys` |
+| `update_project`\* | `name`, `status`, `health`, `leadEmail`, `targetDate` |
+
+### Mobius AI (3) — spend Mobius AI credits
+
+| Tool | Key Parameters |
+|------|----------------|
+| `ask_mobius`\* | `question` |
+| `workspace_briefing`\* | — |
+| `triage_issue`\* | `identifier`, `apply` |
+
+### Journal (6) — the token owner's own, private notebook
+
+| Tool | Key Parameters |
+|------|----------------|
+| `journal_read` | `date` or `limit` |
+| `journal_append` | `line`, `heading` (`记录` / `待办`), `date` |
+| `journal_todos` | `days` |
+| `list_journal_topics` | — |
+| `journal_entries` | `topicId`, `kinds`, `limit` |
+| `journal_entry_append` | `topicId`, `kind`, `body`, `data` |
 
 ## Key Concepts
 
@@ -193,27 +276,38 @@ Steps:
 | `unstarted` | Todo |
 | `started` | In Progress, In Review |
 | `completed` | Done |
-| `canceled` | Canceled |
+| `canceled` | Canceled (and Duplicate on ai-team — query it with `stateNames`) |
 
-### Team Keys
+### Team Keys (2026-11-10 — re-check with `list_teams`)
 
 | Team | Key |
 |------|-----|
-| AI Team (ai-team) | `AI` |
+| ai-team | `AI` |
 | Ad Operations | `ADO` |
-| Platform | `PLT` |
-| Data & Analytics | `DATA` |
+| AI Solutions | `AS` |
+| Team-X | `BEES` |
+| Team-Y | `FE` |
+| Team-Z | `LAB` |
+| Feedback for Mobius | `MOB` |
+| Testing | `TEST` |
 
 ## Troubleshooting
 
-- **401 Unauthorized** — Token missing/expired. Regenerate in Mobius settings.
-- **No tools discovered** — Verify URL is `/api/mcp` (not `/mcp`). Check VPN if off-network.
+- **`/mcp` shows `mobius` needs authentication** — expected on first use; click Authenticate.
+- **Browser sign-in opens but the client never connects** — make sure you are signed
+  in to mobius.feedmob.com in that browser, then retry Authenticate from the client.
+- **401 Unauthorized** — OAuth session expired (re-authenticate in the client), or the
+  token was revoked / agent paused. Do not retry in a loop.
+- **403 on a write** — permission boundary (team membership or agent kind). Check `whoami`.
+- **No tools discovered** — URL must be `/api/mcp` (not `/mcp`). Check network/VPN.
 - **Unknown argument error** — Mobius MCP rejects unknown params (doesn't ignore them).
-- **Comments show as "Mobius AI"** — Using shared token. Switch to personal token.
+- **Comments show as "Mobius AI"** — you are on the shared token. Switch to OAuth.
 
 ## Technical Notes (discovered via live probing)
 
-- `GET /api/mcp` returns 405 with hint: "send JSON-RPC via POST"
-- `POST /api/mcp` without Authorization returns `{"error":{"code":-32001,"message":"Unauthorized"}}`
-- No `Mcp-Session-Id` header returned or required — fully stateless
-- Server instructions field lists tool categories: "Read with list_issues/get_issue/...; write with create_issue/update_issue/..."
+- `POST /api/mcp` without credentials returns `401` with
+  `WWW-Authenticate: Bearer resource_metadata="https://mobius.feedmob.com/.well-known/oauth-protected-resource"`.
+- `GET /api/mcp` returns 405 with hint: "send JSON-RPC via POST".
+- No `Mcp-Session-Id` header returned or required — fully stateless.
+- `GET /api/mcp/events?wait=25&cursor=<id>` is the agent event feed (bot tokens only;
+  403 for a person). Never poll it by hand while a plugin/worker drains it.

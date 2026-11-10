@@ -8,7 +8,7 @@ Mobius Ticket Pilot lets any AI Agent (Hermes, Claude Code, Codex, OpenClaw, Cur
 - Analyze team issue priorities (read-only mode — modifies nothing)
 - Post phase-based progress comments and update status
 - Track team member workload and progress
-- Operate via REST API or MCP Server
+- Operate via the Mobius MCP Server (OAuth sign-in, recommended) or the REST API
 
 > **Difference from Linear ticket-pilot:** Mobius is self-contained — no GitHub mirror sync needed. All issues, comments, and status live on Mobius.
 
@@ -45,11 +45,30 @@ cp -r mobius-ticket-pilot/ ~/.claude/skills/mobius-ticket-pilot/    # or your ag
 
 ## Prerequisites
 
-### Mobius API Token
+### Option A: Mobius MCP + OAuth (recommended)
 
-Mobius uses Bearer token auth (format: `mob_...`):
+Sign in with your Mobius account — no token to create, copy or store.
 
-1. Get a token from Mobius settings (or ask the Mobius admin — currently Teammate-A)
+**Claude Code:**
+```bash
+claude mcp add --transport http --scope user mobius https://mobius.feedmob.com/api/mcp
+```
+Then run `/mcp` in a session → `mobius` → **Authenticate** → sign in in the browser.
+(Desktop app without the `claude` CLI: add
+`"mobius": {"type": "http", "url": "https://mobius.feedmob.com/api/mcp"}` under
+`mcpServers` in `~/.claude.json`, then `/mcp` in a new session.)
+
+**claude.ai / Claude desktop:** Settings → Connectors → Add custom connector →
+`https://mobius.feedmob.com/api/mcp` → Connect.
+
+**Other clients:** see `references/mcp-setup-guide.md`. Headless runtimes (e.g. a
+Hermes gateway) should pair as a Mobius agent instead — the guide explains how.
+
+Verify: ask the agent "check my Mobius connection" — it calls `whoami`.
+
+### Option B: API token (fallback, for REST + scripts)
+
+1. Mobius → Settings → API & Tokens → generate a token (`mob_...`)
 2. Set as `MOBIUS_API_KEY` environment variable
 
 ```bash
@@ -62,10 +81,7 @@ curl -s https://mobius.feedmob.com/api/teams \
   -H "Authorization: Bearer $MOBIUS_API_KEY" | python3 -m json.tool
 ```
 
-### System dependencies
-
-- `curl` — API calls
-- `python3` — CLI helper script
+System dependencies for option B: `curl`, `python3`.
 
 ## Quick Start
 
@@ -147,22 +163,16 @@ python3 "$SCRIPT" team-status          # Team overview
 
 ## Mobius MCP Server
 
-In addition to REST API, Mobius provides a built-in MCP Server (23 tools, a superset of REST):
+Mobius provides a built-in MCP Server (32 tools, a superset of REST except hard delete).
+When it is connected the skill uses it directly — no scripts, no UUIDs:
 
+- Identity: `whoami`, `agent_guide`
+- Issues / comments / links / attachments / projects
 - AI tools: `triage_issue` / `workspace_briefing` / `ask_mobius`
-- Soft delete (archive) / attachments / comment editing / project management / external links
+- Personal journal: `journal_*`
 
-Hermes config:
-```yaml
-mcp_servers:
-  mobius:
-    url: "https://mobius.feedmob.com/api/mcp"
-    headers:
-      Authorization: "Bearer mob_YOUR_TOKEN"
-    timeout: 180
-```
-
-See `references/mcp-setup-guide.md` for multi-client setup (Hermes / Claude Desktop / Cursor / Cline / Continue).
+See `references/mcp-setup-guide.md` for OAuth, agent pairing and token setup across
+clients (Claude Code / claude.ai / Cursor / Hermes / Cline / Continue).
 
 ## Key Design Decisions
 

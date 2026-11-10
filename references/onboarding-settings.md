@@ -15,14 +15,16 @@ Create the parent directory if needed. The file is a local, user-specific defaul
 
 1. **Check whether the settings file exists** and has the required sections.
 2. **Verify Mobius access.**
-   - Check `$MOBIUS_API_KEY` is set and valid.
-   - If missing, ask the user to get a token from Mobius settings or the Mobius admin.
-   - After key is set, verify teams, labels, projects, and state IDs with read-only queries.
-3. **Auto-discover workspace context:**
-   - `GET /api/teams` — discover teams and members
-   - `GET /api/labels` — discover available labels
-   - `GET /api/projects` — discover projects
-   - `GET /api/issues?teamId=<uuid>&limit=5` — sample issues to confirm state IDs
+   - **Mode A (MCP, preferred):** if Mobius MCP tools are available, call `whoami`.
+     If the `mobius` server exists but needs auth, ask the user to sign in
+     (Claude Code: `/mcp` → `mobius` → Authenticate). See `mcp-setup-guide.md`.
+   - **Mode B (REST):** check `$MOBIUS_API_KEY` is set and valid. If missing, offer
+     OAuth setup first; only fall back to asking for a token if MCP is not an option.
+3. **Auto-discover workspace context** (read-only):
+   - Mode A: `list_teams`, `list_labels`, `list_projects`, `list_users`
+     (state IDs are not needed — MCP takes state names).
+   - Mode B: `GET /api/teams`, `GET /api/labels`, `GET /api/projects`,
+     `GET /api/issues?teamId=<uuid>&limit=5` to confirm state IDs.
 4. **Present discovered defaults** to the user for confirmation.
 5. **Write only confirmed, non-secret values** to `settings.md`.
 
@@ -37,10 +39,11 @@ Last verified: YYYY-MM-DD
 
 - Instance: mobius.feedmob.com
 - Default team: ai-team (AI)
-- Default team ID: <uuid>
+- Default team key: AI
+- Default team ID: <uuid>   # mode B only
 - User name: <name>
 - Default project: AI team Action
-- Default project ID: <uuid>
+- Default project ID: <uuid>   # mode B only
 - Default labels: <comma-separated>
 - Status mapping:
   - Start: In Progress
@@ -50,7 +53,7 @@ Last verified: YYYY-MM-DD
 
 ## Auth Method
 
-- Mobius: API key ($MOBIUS_API_KEY)
+- Mobius: MCP OAuth   # or: API key ($MOBIUS_API_KEY)
 
 ## Notes
 
@@ -69,7 +72,8 @@ Never write these to `settings.md` or any file:
 
 Reuse saved defaults on future runs, but revalidate when:
 
-- Mobius API returns auth failure or unexpected response.
+- Mobius returns auth failure (401) or an unexpected response.
+- `whoami` reports a different identity or `kind` than the saved one.
 - The user says they changed workspace, team, or permissions.
 - A write action would affect a different assignee or team than the saved defaults.
 - State IDs change (Mobius re-deployed) — re-discover from `GET /api/issues`.

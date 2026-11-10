@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-11-10
+
+### Added
+- **MCP-first access mode with OAuth.** SKILL.md now starts every task by detecting
+  mode A (Mobius MCP tools present → use them) or mode B (REST + `MOBIUS_API_KEY`).
+  Setup A documents OAuth sign-in for Claude Code (`claude mcp add` / `~/.claude.json`),
+  claude.ai custom connectors and other MCP clients — no `mob_` token needed.
+- SKILL.md: "Identity rules" — person vs paired agent, untrusted issue text, 401 = stop.
+- SKILL.md: MCP equivalents for every lifecycle point (`update_issue` + `add_comment`
+  with the same comment templates as `auto_progress.py`), plus agent run trailers.
+- SKILL.md / `mcp-setup-guide.md`: all 32 MCP tools grouped, key `list_issues`
+  parameters (`stateNames`, `labels`, `query`, `cursor`, `sortBy`…), people-only markers.
+- `mcp-setup-guide.md`: OAuth discovery endpoints, agent pairing via `agent_guide`.
+- `issue-audit-workflow.md`: mode A fetching with cursor pagination.
+
+### Changed
+- Team prefixes updated to the live list (AI, ADO, AS, BEES, FE, LAB, MOB, TEST);
+  `DATA-` / `INT-` / `PLT-` marked stale.
+- Pagination / search / name-filter pitfalls now say which mode they apply to
+  (MCP: `query`, `cursor`, max 200 per page; REST: `q`, no cursor).
+- Delegation pitfall covers MCP `delegateToEmail` as well as REST `delegatedAgentId`.
+- `auto_progress.py` / `mobius_cli.py` documented as mode B tools (ai-team only).
+- Onboarding: verify with `whoami`; settings record auth method and team key.
+- READMEs: OAuth setup is option A, API token is option B.
+
+### Fixed
+- `install.sh`: `--agent claude,codex` comma lists now work (README already promised it).
+- `install.sh`: without git it now downloads the full repo tarball; before, it fetched
+  only 4 files and missed `auto_progress.py` and most references.
+- `install.sh`: auto-detect now prefers Claude Code, matching the README.
+- SKILL.md frontmatter opening `---` had trailing spaces.
+
 ## [1.1.0] - 2026-07-31
 
 ### Added

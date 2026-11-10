@@ -8,7 +8,7 @@ Mobius Ticket Pilot 让任何 AI Agent（Hermes、Claude Code、Codex、OpenClaw
 - 分析团队 Issue 优先级（只读模式，不动任何东西）
 - 自动发进度评论、改状态
 - 追踪团队成员工作进展
-- 通过 REST API 或 MCP Server 操作
+- 通过 Mobius MCP Server（OAuth 登录，推荐）或 REST API 操作
 
 > **与 Linear 版 ticket-pilot 的区别**：Mobius 是自包含系统，不需要 GitHub 镜像同步。所有 Issue、评论、状态都在 Mobius 上。
 
@@ -45,11 +45,29 @@ cp -r mobius-ticket-pilot/ ~/.claude/skills/mobius-ticket-pilot/    # 换成你�
 
 ## 前置条件
 
-### Mobius API Token
+### 方式 A：Mobius MCP + OAuth 登录（推荐）
 
-Mobius 使用 Bearer Token 认证（格式：`mob_...`）：
+用 Mobius 账号在浏览器里登录即可，不用生成、复制或保存 token。
 
-1. 从 Mobius 设置页面获取 Token（或联系 Mobius 管理员——目前是 Teammate-A）
+**Claude Code：**
+```bash
+claude mcp add --transport http --scope user mobius https://mobius.feedmob.com/api/mcp
+```
+然后在会话里输入 `/mcp` → 选 `mobius` → **Authenticate** → 浏览器里登录授权。
+（只有桌面 App、没有 `claude` 命令行时：在 `~/.claude.json` 的 `mcpServers` 里加
+`"mobius": {"type": "http", "url": "https://mobius.feedmob.com/api/mcp"}`，再开新会话用 `/mcp` 登录。）
+
+**claude.ai / Claude 桌面版：** 设置 → 连接器 → 添加自定义连接器 →
+`https://mobius.feedmob.com/api/mcp` → 连接。
+
+**其他客户端：** 见 `references/mcp-setup-guide.md`。无界面的运行环境（比如 Hermes
+gateway）应该以 Mobius agent 身份配对，指南里有说明。
+
+验证：对 Agent 说"检查 Mobius 连接状态"，它会调用 `whoami`。
+
+### 方式 B：API Token（备用，给 REST 和脚本用）
+
+1. Mobius → 设置 → API & Tokens → 生成 token（`mob_...`）
 2. 设置为环境变量 `MOBIUS_API_KEY`
 
 ```bash
@@ -62,10 +80,7 @@ curl -s https://mobius.feedmob.com/api/teams \
   -H "Authorization: Bearer $MOBIUS_API_KEY" | python3 -m json.tool
 ```
 
-### 系统依赖
-
-- `curl` — API 调用
-- `python3` — CLI 辅助脚本
+方式 B 需要的系统依赖：`curl`、`python3`。
 
 ## 快速上手
 
@@ -149,22 +164,14 @@ python3 "$SCRIPT" team-status          # 团队状态总览
 
 ## Mobius MCP Server
 
-除了 REST API，Mobius 还提供内置 MCP Server（23 个工具，REST 的超集）：
+Mobius 内置 MCP Server（32 个工具，除硬删除外是 REST 的超集）。连上之后 skill 直接调用 MCP 工具，不需要脚本，也不需要 UUID：
 
+- 身份：`whoami`、`agent_guide`
+- Issue / 评论 / 链接 / 附件 / 项目
 - AI 工具：`triage_issue` / `workspace_briefing` / `ask_mobius`
-- 软删除（archive）/ 附件管理 / 评论编辑 / 项目管理 / 外部链接
+- 个人日志：`journal_*`
 
-Hermes 配置：
-```yaml
-mcp_servers:
-  mobius:
-    url: "https://mobius.feedmob.com/api/mcp"
-    headers:
-      Authorization: "Bearer mob_YOUR_TOKEN"
-    timeout: 180
-```
-
-详见 `references/mcp-setup-guide.md`（支持 Hermes / Claude Desktop / Cursor / Cline / Continue）。
+OAuth、agent 配对和 token 在各客户端的配置方法见 `references/mcp-setup-guide.md`（Claude Code / claude.ai / Cursor / Hermes / Cline / Continue）。
 
 ## 工作原理
 
@@ -172,7 +179,7 @@ mcp_servers:
 Mobius（唯一真相源）
   ├── REST API (/api/issues, /api/teams, /api/labels ...)
   │     └── curl / python3 直接调用
-  ├── MCP Server (/api/mcp, JSON-RPC, 23 tools)
+  ├── MCP Server (/api/mcp, JSON-RPC, 32 tools, OAuth)
   │     └── Hermes / Claude / Cursor 等 MCP 客户端
   └── Web UI (https://mobius.feedmob.com/issue/AI-XXXX)
         └── 报告/评论中的链接格式
@@ -180,11 +187,13 @@ Mobius（唯一真相源）
 
 ### 认证
 
-| Agent | Mobius |
-|-------|--------|
-| 所有 Agent | `$MOBIUS_API_KEY`（环境变量） |
+| 方式 | 适用 | 凭证 |
+|------|------|------|
+| MCP + OAuth（推荐） | 能在浏览器登录的客户端 | 客户端自己保存，无需手动处理 |
+| Agent 配对 | 无界面的运行环境 | 配对后得到 agent 专属 token |
+| REST + API Token | 不支持 MCP 的场景、脚本 | `$MOBIUS_API_KEY`（环境变量） |
 
-Skill 会自动检测 Token 并用 Bearer 认证，无需 Agent 专属配置。
+Skill 每次先检测有没有 Mobius MCP 工具，有就用 MCP，没有再退回 REST + `$MOBIUS_API_KEY`。
 
 ## 关键设计决策
 

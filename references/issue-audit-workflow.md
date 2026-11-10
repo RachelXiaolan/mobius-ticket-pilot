@@ -8,7 +8,25 @@ Read-only team issue priority analysis. **Never modify issues during an audit.**
 - Regular cadence: every 2-5 days (the user's team does Mon/Wed/Fri rhythm)
 - After team meetings that produce many new issues
 
-## API Calls (all read-only)
+## Mode A — MCP calls (preferred, all read-only)
+
+1. **Active issues**: for each `stateType` in `backlog`, `unstarted`, `started`, call
+   `list_issues(teamKey="AI", stateType=<type>, limit=200)` and keep calling with
+   `cursor=nextCursor` while `hasMore` is true. One call per type is NOT enough once a
+   bucket exceeds 200.
+   - Useful extras: `sortBy="updated", sortOrder="asc"` surfaces the stalest first;
+     `noAssignee=true` lists unassigned; `stateNames=["In Review"]` lists 待验收;
+     `updatedBefore=<ISO date 60d ago>` lists ancient items.
+2. **Key issue details**: `get_issue(identifier)` — description (incl. `### AI 理解`),
+   comments, links and recent activity in one call. Fetch only the issues you will
+   actually discuss.
+3. **Per-person breakdown**: same rules as below (assignee AND labels); in mode A you
+   can also filter server-side with `labels=["Teammate-B"]` or `assigneeEmail="..."`.
+
+Do not call `workspace_briefing` / `ask_mobius` as part of the routine audit — they
+spend Mobius AI credits. Use them only when the user asks.
+
+## Mode B — REST calls (fallback, all read-only)
 
 ### 1. Full active issue list
 
